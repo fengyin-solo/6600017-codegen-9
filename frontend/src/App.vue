@@ -16,6 +16,9 @@
         </div>
       </div>
 
+      <!-- Moon Phase Companion -->
+      <MoonPhase :moon="store.moonPhase" />
+
       <!-- Time Travel -->
       <div>
         <label class="text-gray-400 text-xs">时间旅行</label>
@@ -83,6 +86,7 @@
 import { ref } from 'vue'
 import { useSkyStore } from './store/sky'
 import StarCanvas from './components/StarCanvas.vue'
+import MoonPhase from './components/MoonPhase.vue'
 
 const store = useSkyStore()
 const dateStr = ref(new Date().toISOString().slice(0, 16))

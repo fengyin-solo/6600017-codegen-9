@@ -1,7 +1,87 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { STARS, CONSTELLATIONS } from '../data/stars'
-import type { Star } from '../types'
+import type { Star, MoonPhaseInfo, MoonPhaseName } from '../types'
+
+const SYNODIC_MONTH = 29.53058867  // 朔望月平均周期（天）
+// 参考基准：2000年1月6日 18:14 UTC 是已知的新月时刻
+const NEW_MOON_JD_2000 = 2451550.26
+
+function dateToJD(d: Date): number {
+  return d.getTime() / 86400000 + 2440587.5
+}
+
+function getMoonAge(d: Date): number {
+  const jd = dateToJD(d)
+  let daysSinceNew = (jd - NEW_MOON_JD_2000) % SYNODIC_MONTH
+  if (daysSinceNew < 0) daysSinceNew += SYNODIC_MONTH
+  return daysSinceNew
+}
+
+function getMoonPhaseInfo(d: Date): MoonPhaseInfo {
+  const age = getMoonAge(d)
+  // 照度：使用余弦函数近似，0=新月, 100=满月
+  const illumination = (1 - Math.cos(2 * Math.PI * age / SYNODIC_MONTH)) / 2 * 100
+  const isWaxing = age < SYNODIC_MONTH / 2
+
+  let phase: MoonPhaseName
+  let phaseNameCn: string
+  let observationImpact: string
+  let observationScore: number
+
+  // 将周期划分为8个主要月相
+  if (age < 1.84566 || age >= 27.6849) {
+    phase = 'new'
+    phaseNameCn = '新月'
+    observationImpact = '夜空极为黑暗，最适合观测深空天体（星云、星团、星系）和暗弱星辰。'
+    observationScore = 95
+  } else if (age < 5.53699) {
+    phase = 'waxingCrescent'
+    phaseNameCn = '蛾眉月'
+    observationImpact = '月相纤细，仅傍晚可见，夜晚后半段无月光干扰，适合深空观测。'
+    observationScore = 85
+  } else if (age < 9.22831) {
+    phase = 'firstQuarter'
+    phaseNameCn = '上弦月'
+    observationImpact = '半轮明月，前半夜有中等月光干扰，建议观测远离月球方向的天体。'
+    observationScore = 60
+  } else if (age < 12.91963) {
+    phase = 'waxingGibbous'
+    phaseNameCn = '盈凸月'
+    observationImpact = '月面大半明亮，月光影响显著，适合观测行星和亮星，不适合深空。'
+    observationScore = 35
+  } else if (age < 16.61096) {
+    phase = 'full'
+    phaseNameCn = '满月'
+    observationImpact = '整轮明月当空，天空背景极亮，仅适合观测月球表面细节，深空观测不建议。'
+    observationScore = 10
+  } else if (age < 20.30228) {
+    phase = 'waningGibbous'
+    phaseNameCn = '亏凸月'
+    observationImpact = '月面大半明亮，后半夜有月光干扰，可观测前半夜无月时段。'
+    observationScore = 35
+  } else if (age < 23.99361) {
+    phase = 'lastQuarter'
+    phaseNameCn = '下弦月'
+    observationImpact = '半轮明月，后半夜升起有干扰，前半夜适合深空观测。'
+    observationScore = 60
+  } else {
+    phase = 'waningCrescent'
+    phaseNameCn = '残月'
+    observationImpact = '月相纤细，仅黎明前可见，前半夜完全无月光，最佳观测时段。'
+    observationScore = 85
+  }
+
+  return {
+    phase,
+    phaseNameCn,
+    age,
+    illumination,
+    isWaxing,
+    observationImpact,
+    observationScore,
+  }
+}
 
 export const useSkyStore = defineStore('sky', () => {
   const viewDate = ref(new Date())
@@ -14,6 +94,8 @@ export const useSkyStore = defineStore('sky', () => {
   const selectedStar = ref<Star | null>(null)
   const searchQuery = ref('')
   const latitude = ref(39.9) // Beijing default
+
+  const moonPhase = computed<MoonPhaseInfo>(() => getMoonPhaseInfo(viewDate.value))
 
   const localSiderealTime = computed(() => {
     const d = viewDate.value
@@ -72,6 +154,7 @@ export const useSkyStore = defineStore('sky', () => {
   return {
     viewDate, zoom, panX, panY, showLabels, showConstLines, showGrid,
     selectedStar, searchQuery, latitude, localSiderealTime, filteredStars,
+    moonPhase,
     projectStar, starRadius, spectralColor, selectStar,
     STARS, CONSTELLATIONS
   }
